@@ -32,6 +32,7 @@ router.post('/signup', async (req, res) => {
 router.post('/login', async (req, res) => {
   const { identifier, password } = req.body; // identifier can be email or username
   try {
+    console.log('Login request body:', req.body); // Debug log
     const user = await User.findOne({ $or: [{ email: identifier }, { username: identifier }] });
     if (!user) return res.status(400).json({ msg: 'Invalid credentials' });
 
@@ -44,7 +45,8 @@ router.post('/login', async (req, res) => {
     res.cookie('refreshToken', refreshToken, { httpOnly: true, secure: true, sameSite: 'strict' });
     res.json({ accessToken });
   } catch (err) {
-    res.status(500).json({ msg: 'Server error' });
+    console.error('Login error:', err.message); // Log the error
+    res.status(500).json({ msg: 'Server error', error: err.message }); // Include error message for debugging
   }
 });
 
