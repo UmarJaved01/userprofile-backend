@@ -5,7 +5,7 @@ const User = require('../models/User');
 const redis = require('../redis');
 
 const generateAccessToken = (user) => {
-  return jwt.sign({ user: { id: user._id } }, process.env.JWT_SECRET, { expiresIn: '5m' });
+  return jwt.sign({ user: { id: user._id } }, process.env.JWT_SECRET, { expiresIn: '30s' });
 };
 
 const generateRefreshToken = (user) => {
