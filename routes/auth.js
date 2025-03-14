@@ -5,7 +5,7 @@ const User = require('../models/User');
 const redis = require('../redis');
 
 const generateAccessToken = (user) => {
-  return jwt.sign({ user: { id: user._id } }, process.env.JWT_SECRET, { expiresIn: '1m' });
+  return jwt.sign({ user: { id: user._id } }, process.env.JWT_SECRET, { expiresIn: '5m' });
 };
 
 const generateRefreshToken = (user) => {
@@ -25,7 +25,8 @@ router.post('/signup', async (req, res) => {
 
     res.json({ msg: 'Signup successful, please login' });
   } catch (err) {
-    res.status(500).json({ msg: 'Server error' });
+    console.error('Signup error:', err.message);
+    res.status(500).json({ msg: 'Server error', error: err.message });
   }
 });
 
@@ -42,14 +43,16 @@ router.post('/login', async (req, res) => {
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
 
-    // Store refresh token in Redis (optional but recommended for security)
-    await redis.set(`refresh_${user._id}`, refreshToken, 'EX', 7 * 24 * 60 * 60);
+    // Store refresh token in Redis as part of a list
+    const redisKey = `refresh_tokens_${user._id}`;
+    await redis.lpush(redisKey, refreshToken); // Add token to list
+    await redis.expire(redisKey, 7 * 24 * 60 * 60); // Set TTL for the list
 
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: true,
-      sameSite: 'none', // Allow cross-site requests
-      path: '/', // Ensure cookie is sent for all paths
+      sameSite: 'none',
+      path: '/',
     });
     res.json({ accessToken });
   } catch (err) {
@@ -63,14 +66,22 @@ router.post('/refresh', async (req, res) => {
   if (!refreshToken) return res.status(401).json({ msg: 'No refresh token' });
 
   try {
-    // Verify the refresh token against Redis (optional)
-    const storedToken = await redis.get(`refresh_${req.user?._id || 'unknown'}`);
-    if (storedToken !== refreshToken) {
+    console.log('Refresh attempt with token:', refreshToken);
+    const decoded = jwt.verify(refreshToken, process.env.REFRESH_SECRET);
+    const userId = decoded.user.id;
+    console.log('Decoded user ID:', userId);
+
+    // Check if the refresh token exists in the Redis list
+    const redisKey = `refresh_tokens_${userId}`;
+    const storedTokens = await redis.lrange(redisKey, 0, -1); // Get all tokens in the list
+    console.log('Stored tokens from Redis:', storedTokens);
+
+    if (!storedTokens.includes(refreshToken)) {
+      console.error('Refresh token not found in Redis:', { refreshToken, storedTokens });
       return res.status(401).json({ msg: 'Invalid refresh token (Redis mismatch)' });
     }
 
-    const decoded = jwt.verify(refreshToken, process.env.REFRESH_SECRET);
-    const user = await User.findById(decoded.user.id);
+    const user = await User.findById(userId);
     if (!user) return res.status(401).json({ msg: 'Invalid refresh token' });
 
     const accessToken = generateAccessToken(user);
@@ -78,6 +89,32 @@ router.post('/refresh', async (req, res) => {
   } catch (err) {
     console.error('Refresh error:', err.message);
     res.status(401).json({ msg: 'Invalid refresh token' });
+  }
+});
+
+// Add a logout route to invalidate the refresh token
+router.post('/logout', async (req, res) => {
+  const refreshToken = req.cookies.refreshToken;
+  if (!refreshToken) return res.status(400).json({ msg: 'No refresh token' });
+
+  try {
+    const decoded = jwt.verify(refreshToken, process.env.REFRESH_SECRET);
+    const userId = decoded.user.id;
+
+    // Remove the specific refresh token from Redis
+    const redisKey = `refresh_tokens_${userId}`;
+    await redis.lrem(redisKey, 0, refreshToken); // Remove the token from the list
+
+    res.clearCookie('refreshToken', {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'none',
+      path: '/',
+    });
+    res.json({ msg: 'Logged out successfully' });
+  } catch (err) {
+    console.error('Logout error:', err.message);
+    res.status(500).json({ msg: 'Server error', error: err.message });
   }
 });
 
