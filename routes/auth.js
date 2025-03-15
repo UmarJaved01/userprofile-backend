@@ -5,7 +5,7 @@ const User = require('../models/User');
 const redis = require('../redis');
 
 const generateAccessToken = (user) => {
-  return jwt.sign({ user: { id: user._id } }, process.env.JWT_SECRET, { expiresIn: '2m' });
+  return jwt.sign({ user: { id: user._id } }, process.env.JWT_SECRET, { expiresIn: '20s' });
 };
 
 const generateRefreshToken = (user) => {
@@ -46,7 +46,7 @@ router.post('/login', async (req, res) => {
     // Store refresh token in Redis as part of a list
     const redisKey = `refresh_tokens_${user._id}`;
     await redis.lpush(redisKey, refreshToken); // Add token to list
-    await redis.expire(redisKey, 7 * 24 * 60 * 60); // Set TTL for the list
+    await redis.expire(redisKey, 7 * 24 * 60 * 60); // Set TTL for 7 days
 
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
@@ -84,15 +84,17 @@ router.post('/refresh', async (req, res) => {
     const user = await User.findById(userId);
     if (!user) return res.status(401).json({ msg: 'Invalid refresh token' });
 
-    const accessToken = generateAccessToken(user);
-    res.json({ accessToken });
+    const newAccessToken = generateAccessToken(user);
+    // Optionally remove the used refresh token for security (single-use tokens)
+    // await redis.lrem(redisKey, 0, refreshToken);
+
+    res.json({ accessToken: newAccessToken });
   } catch (err) {
     console.error('Refresh error:', err.message);
     res.status(401).json({ msg: 'Invalid refresh token' });
   }
 });
 
-// Add a logout route to invalidate the refresh token
 router.post('/logout', async (req, res) => {
   const refreshToken = req.cookies.refreshToken;
   if (!refreshToken) return res.status(400).json({ msg: 'No refresh token' });
