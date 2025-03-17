@@ -69,7 +69,7 @@ router.post('/refresh', async (req, res) => {
   if (!refreshToken) {
     console.log('No refresh token provided');
     res.clearCookie('refreshToken', cookieOptions); // Clear cookie if no refresh token
-    return res.status(401).json({ msg: 'No refresh token provided' });
+    return res.status(401).redirect('/');
   }
 
   try {
