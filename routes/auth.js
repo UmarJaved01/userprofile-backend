@@ -5,11 +5,11 @@ const User = require('../models/User');
 const redis = require('../redis');
 
 const generateAccessToken = (user) => {
-  return jwt.sign({ user: { id: user._id } }, process.env.JWT_SECRET, { expiresIn: '1m' });
+  return jwt.sign({ user: { id: user._id } }, process.env.JWT_SECRET, { expiresIn: '30s' });
 };
 
 const generateRefreshToken = (user) => {
-  return jwt.sign({ user: { id: user._id } }, process.env.REFRESH_SECRET, { expiresIn: '2m' });
+  return jwt.sign({ user: { id: user._id } }, process.env.REFRESH_SECRET, { expiresIn: '3m' });
 };
 
 // Determine cookie settings based on environment
@@ -96,7 +96,7 @@ router.post('/refresh', async (req, res) => {
     res.json({ accessToken: newAccessToken });
   } catch (err) {
     console.error('Refresh token verification failed:', err.message);
-    res.status(401).redirect('/');
+    res.status(401).json({ msg: 'Invalid refresh token', error: err.message });
   }
 });
 
