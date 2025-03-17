@@ -5,11 +5,11 @@ const User = require('../models/User');
 const redis = require('../redis');
 
 const generateAccessToken = (user) => {
-  return jwt.sign({ user: { id: user._id } }, process.env.JWT_SECRET, { expiresIn: '30s' });
+  return jwt.sign({ user: { id: user._id } }, process.env.JWT_SECRET, { expiresIn: '15m' });
 };
 
 const generateRefreshToken = (user) => {
-  return jwt.sign({ user: { id: user._id } }, process.env.REFRESH_SECRET, { expiresIn: '3m' });
+  return jwt.sign({ user: { id: user._id } }, process.env.REFRESH_SECRET, { expiresIn: '7d' });
 };
 
 // Determine cookie settings based on environment
