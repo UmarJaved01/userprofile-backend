@@ -5,20 +5,11 @@ const User = require('../models/User');
 const redis = require('../redis');
 
 const generateAccessToken = (user) => {
-  return jwt.sign({ user: { id: user._id } }, process.env.JWT_SECRET, { expiresIn: '15m' });
+  return jwt.sign({ user: { id: user._id } }, process.env.JWT_SECRET, { expiresIn: '3m' });
 };
 
 const generateRefreshToken = (user) => {
-  return jwt.sign({ user: { id: user._id } }, process.env.REFRESH_SECRET, { expiresIn: '7d' });
-};
-
-// Determine cookie settings based on environment
-const isProduction = process.env.NODE_ENV === 'production';
-const cookieOptions = {
-  httpOnly: true,
-  secure: isProduction, // Set to true in production (HTTPS), false in development (HTTP)
-  sameSite: isProduction ? 'none' : 'lax', // Use 'none' in production for cross-origin, 'lax' in development
-  path: '/',
+  return jwt.sign({ user: { id: user._id } }, process.env.REFRESH_SECRET, { expiresIn: '5m' });
 };
 
 router.post('/signup', async (req, res) => {
@@ -55,7 +46,12 @@ router.post('/login', async (req, res) => {
     await redis.lpush(redisKey, refreshToken);
     await redis.expire(redisKey, 7 * 24 * 60 * 60);
 
-    res.cookie('refreshToken', refreshToken, cookieOptions);
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: false, // Set to false for local development (HTTP)
+      sameSite: 'lax', // Use 'lax' for local development
+      path: '/',
+    });
     res.json({ accessToken });
   } catch (err) {
     console.error('Login error:', err.message);
@@ -111,7 +107,12 @@ router.post('/logout', async (req, res) => {
     const redisKey = `refresh_tokens_${userId}`;
     await redis.lrem(redisKey, 0, refreshToken);
 
-    res.clearCookie('refreshToken', cookieOptions);
+    res.clearCookie('refreshToken', {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+    });
     res.json({ msg: 'Logged out successfully' });
   } catch (err) {
     console.error('Logout error:', err.message);
