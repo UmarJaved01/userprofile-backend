@@ -65,48 +65,37 @@ router.post('/login', async (req, res) => {
 
 router.post('/refresh', async (req, res) => {
   const refreshToken = req.cookies.refreshToken;
-  console.log('Refresh token received:', refreshToken); // Debug log
   if (!refreshToken) {
-    console.log('No refresh token provided');
-    // Clear the cookie if no refresh token is provided
     res.clearCookie('refreshToken', cookieOptions);
-    return res.status(401).json({ msg: 'No refresh token provided', logout: true });
+    return res.status(401).json({ msg: 'No refresh token provided' });
   }
 
   try {
     const decoded = jwt.verify(refreshToken, process.env.REFRESH_SECRET);
     const userId = decoded.user.id;
-    console.log('Decoded user ID from refresh token:', userId);
 
     const redisKey = `refresh_tokens_${userId}`;
     const storedTokens = await redis.lrange(redisKey, 0, -1);
-    console.log('Stored tokens in Redis:', storedTokens);
 
     if (!storedTokens.includes(refreshToken)) {
-      console.log('Refresh token not found in Redis:', refreshToken);
-      // Clear the cookie if the refresh token is not found in Redis
       res.clearCookie('refreshToken', cookieOptions);
-      return res.status(401).json({ msg: 'Invalid refresh token (not found in Redis)', logout: true });
+      return res.status(401).json({ msg: 'Invalid refresh token' });
     }
 
     const user = await User.findById(userId);
     if (!user) {
-      console.log('User not found for ID:', userId);
-      // Clear the cookie if the user is not found
       res.clearCookie('refreshToken', cookieOptions);
-      return res.status(401).json({ msg: 'User not found', logout: true });
+      return res.status(401).json({ msg: 'User not found' });
     }
 
     const newAccessToken = generateAccessToken(user);
-    console.log('New access token generated:', newAccessToken);
     res.json({ accessToken: newAccessToken });
   } catch (err) {
-    console.error('Refresh token verification failed:', err.message);
-    // Clear the cookie if the refresh token is invalid or expired
     res.clearCookie('refreshToken', cookieOptions);
-    return res.status(401).json({ msg: 'Invalid refresh token', error: err.message, logout: true });
+    return res.status(401).json({ msg: 'Invalid refresh token', error: err.message });
   }
 });
+
 
 router.post('/logout', async (req, res) => {
   const refreshToken = req.cookies.refreshToken;
