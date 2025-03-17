@@ -68,8 +68,7 @@ router.post('/refresh', async (req, res) => {
   console.log('Refresh token received:', refreshToken); // Debug log
   if (!refreshToken) {
     console.log('No refresh token provided');
-    res.clearCookie('refreshToken', cookieOptions); // Clear cookie if no refresh token
-    return res.status(401).redirect('/');
+    return res.status(401).json({ msg: 'No refresh token provided' });
   }
 
   try {
@@ -83,14 +82,12 @@ router.post('/refresh', async (req, res) => {
 
     if (!storedTokens.includes(refreshToken)) {
       console.log('Refresh token not found in Redis:', refreshToken);
-      res.clearCookie('refreshToken', cookieOptions); // Clear cookie if invalid
       return res.status(401).json({ msg: 'Invalid refresh token (not found in Redis)' });
     }
 
     const user = await User.findById(userId);
     if (!user) {
       console.log('User not found for ID:', userId);
-      res.clearCookie('refreshToken', cookieOptions); // Clear cookie if user not found
       return res.status(401).json({ msg: 'User not found' });
     }
 
@@ -99,8 +96,7 @@ router.post('/refresh', async (req, res) => {
     res.json({ accessToken: newAccessToken });
   } catch (err) {
     console.error('Refresh token verification failed:', err.message);
-    res.clearCookie('refreshToken', cookieOptions); // Clear cookie on error
-    res.status(401).json({ msg: 'Invalid refresh token', error: err.message });
+    res.status(401).redirect('/');
   }
 });
 
