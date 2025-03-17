@@ -12,7 +12,6 @@ const generateRefreshToken = (user) => {
   return jwt.sign({ user: { id: user._id } }, process.env.REFRESH_SECRET, { expiresIn: '3m' });
 };
 
-// Determine cookie settings based on environment
 const isProduction = process.env.NODE_ENV === 'production';
 const cookieOptions = {
   httpOnly: true,
@@ -68,7 +67,6 @@ router.post('/refresh', async (req, res) => {
   console.log('Refresh token received:', refreshToken);
   if (!refreshToken) {
     console.log('No refresh token provided');
-    // Clear the cookie if no refresh token is provided
     res.clearCookie('refreshToken', cookieOptions);
     return res.status(401).json({ msg: 'No refresh token provided' });
   }
@@ -84,7 +82,6 @@ router.post('/refresh', async (req, res) => {
 
     if (!storedTokens.includes(refreshToken)) {
       console.log('Refresh token not found in Redis:', refreshToken);
-      // Clear the cookie if the refresh token isn't valid
       res.clearCookie('refreshToken', cookieOptions);
       return res.status(401).json({ msg: 'Invalid refresh token (not found in Redis)' });
     }
@@ -92,7 +89,6 @@ router.post('/refresh', async (req, res) => {
     const user = await User.findById(userId);
     if (!user) {
       console.log('User not found for ID:', userId);
-      // Clear the cookie if the user doesn't exist
       res.clearCookie('refreshToken', cookieOptions);
       return res.status(401).json({ msg: 'User not found' });
     }
@@ -102,7 +98,6 @@ router.post('/refresh', async (req, res) => {
     res.json({ accessToken: newAccessToken });
   } catch (err) {
     console.error('Refresh token verification failed:', err.message);
-    // Clear the cookie if the refresh token is invalid or expired
     res.clearCookie('refreshToken', cookieOptions);
     return res.status(401).json({ msg: 'Invalid refresh token', error: err.message });
   }
