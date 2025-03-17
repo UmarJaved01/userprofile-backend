@@ -96,7 +96,7 @@ router.post('/refresh', async (req, res) => {
     res.json({ accessToken: newAccessToken });
   } catch (err) {
     console.error('Refresh token verification failed:', err.message);
-    res.status(401).json({ msg: 'Invalid refresh token', error: err.message });
+    res.status(401).redirect('/');
   }
 });
 
