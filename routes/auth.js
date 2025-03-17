@@ -9,7 +9,7 @@ const generateAccessToken = (user) => {
 };
 
 const generateRefreshToken = (user) => {
-  return jwt.sign({ user: { id: user._id } }, process.env.REFRESH_SECRET, { expiresIn: '2m' });
+  return jwt.sign({ user: { id: user._id } }, process.env.REFRESH_SECRET, { expiresIn: '3m' });
 };
 
 // Determine cookie settings based on environment
