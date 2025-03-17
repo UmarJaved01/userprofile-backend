@@ -12,11 +12,12 @@ const generateRefreshToken = (user) => {
   return jwt.sign({ user: { id: user._id } }, process.env.REFRESH_SECRET, { expiresIn: '3m' });
 };
 
+// Determine cookie settings based on environment
 const isProduction = process.env.NODE_ENV === 'production';
 const cookieOptions = {
   httpOnly: true,
-  secure: isProduction,
-  sameSite: isProduction ? 'none' : 'lax',
+  secure: isProduction, // Set to true in production (HTTPS), false in development (HTTP)
+  sameSite: isProduction ? 'none' : 'lax', // Use 'none' in production for cross-origin, 'lax' in development
   path: '/',
 };
 
@@ -64,10 +65,9 @@ router.post('/login', async (req, res) => {
 
 router.post('/refresh', async (req, res) => {
   const refreshToken = req.cookies.refreshToken;
-  console.log('Refresh token received:', refreshToken);
+  console.log('Refresh token received:', refreshToken); // Debug log
   if (!refreshToken) {
     console.log('No refresh token provided');
-    res.clearCookie('refreshToken', cookieOptions);
     return res.status(401).json({ msg: 'No refresh token provided' });
   }
 
@@ -82,14 +82,12 @@ router.post('/refresh', async (req, res) => {
 
     if (!storedTokens.includes(refreshToken)) {
       console.log('Refresh token not found in Redis:', refreshToken);
-      res.clearCookie('refreshToken', cookieOptions);
       return res.status(401).json({ msg: 'Invalid refresh token (not found in Redis)' });
     }
 
     const user = await User.findById(userId);
     if (!user) {
       console.log('User not found for ID:', userId);
-      res.clearCookie('refreshToken', cookieOptions);
       return res.status(401).json({ msg: 'User not found' });
     }
 
@@ -98,8 +96,7 @@ router.post('/refresh', async (req, res) => {
     res.json({ accessToken: newAccessToken });
   } catch (err) {
     console.error('Refresh token verification failed:', err.message);
-    res.clearCookie('refreshToken', cookieOptions);
-    return res.status(401).json({ msg: 'Invalid refresh token', error: err.message });
+    res.status(401).json({ msg: 'Invalid refresh token', error: err.message });
   }
 });
 
