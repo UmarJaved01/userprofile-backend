@@ -4,13 +4,21 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const redis = require('../redis');
 
-// Generate tokens
 const generateAccessToken = (user) => {
-  return jwt.sign({ user: { id: user._id } }, process.env.JWT_SECRET, { expiresIn: '15m' });
+  return jwt.sign({ user: { id: user._id } }, process.env.JWT_SECRET, { expiresIn: '1m' });
 };
 
 const generateRefreshToken = (user) => {
-  return jwt.sign({ user: { id: user._id } }, process.env.REFRESH_SECRET, { expiresIn: '7d' });
+  return jwt.sign({ user: { id: user._id } }, process.env.REFRESH_SECRET, { expiresIn: '2m' });
+};
+
+// Determine cookie settings based on environment
+const isProduction = process.env.NODE_ENV === 'production';
+const cookieOptions = {
+  httpOnly: true,
+  secure: isProduction, // Set to true in production (HTTPS), false in development (HTTP)
+  sameSite: isProduction ? 'none' : 'lax', // Use 'none' in production for cross-origin, 'lax' in development
+  path: '/',
 };
 
 router.post('/signup', async (req, res) => {
@@ -45,17 +53,9 @@ router.post('/login', async (req, res) => {
 
     const redisKey = `refresh_tokens_${user._id}`;
     await redis.lpush(redisKey, refreshToken);
-    await redis.expire(redisKey, 7 * 24 * 60 * 60); // 7 days in seconds
+    await redis.expire(redisKey, 7 * 24 * 60 * 60);
 
-    // Set refresh token as an HTTP-only cookie
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production', // Secure in production
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Cross-site in production
-      path: '/',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
-    });
-
+    res.cookie('refreshToken', refreshToken, cookieOptions);
     res.json({ accessToken });
   } catch (err) {
     console.error('Login error:', err.message);
@@ -65,7 +65,7 @@ router.post('/login', async (req, res) => {
 
 router.post('/refresh', async (req, res) => {
   const refreshToken = req.cookies.refreshToken;
-  console.log('Refresh token received:', refreshToken);
+  console.log('Refresh token received:', refreshToken); // Debug log
   if (!refreshToken) {
     console.log('No refresh token provided');
     return res.status(401).json({ msg: 'No refresh token provided' });
@@ -96,7 +96,7 @@ router.post('/refresh', async (req, res) => {
     res.json({ accessToken: newAccessToken });
   } catch (err) {
     console.error('Refresh token verification failed:', err.message);
-    res.status(401).json({ msg: 'Invalid refresh token' });
+    res.status(401).redirect('/');
   }
 });
 
@@ -111,12 +111,7 @@ router.post('/logout', async (req, res) => {
     const redisKey = `refresh_tokens_${userId}`;
     await redis.lrem(redisKey, 0, refreshToken);
 
-    res.clearCookie('refreshToken', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      path: '/',
-    });
+    res.clearCookie('refreshToken', cookieOptions);
     res.json({ msg: 'Logged out successfully' });
   } catch (err) {
     console.error('Logout error:', err.message);
