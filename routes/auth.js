@@ -16,8 +16,8 @@ const generateRefreshToken = (user) => {
 const isProduction = process.env.NODE_ENV === 'production';
 const cookieOptions = {
   httpOnly: true,
-  secure: isProduction, // Set to true in production (HTTPS), false in development (HTTP)
-  sameSite: isProduction ? 'none' : 'lax', // Use 'none' in production for cross-origin, 'lax' in development
+  secure: isProduction,
+  sameSite: isProduction ? 'none' : 'lax',
   path: '/',
 };
 
@@ -65,7 +65,7 @@ router.post('/login', async (req, res) => {
 
 router.post('/refresh', async (req, res) => {
   const refreshToken = req.cookies.refreshToken;
-  console.log('Refresh token received:', refreshToken); // Debug log
+  console.log('Refresh token received:', refreshToken);
   if (!refreshToken) {
     console.log('No refresh token provided');
     return res.status(401).json({ msg: 'No refresh token provided' });
@@ -116,6 +116,38 @@ router.post('/logout', async (req, res) => {
   } catch (err) {
     console.error('Logout error:', err.message);
     res.status(500).json({ msg: 'Server error', error: err.message });
+  }
+});
+
+// New endpoint to validate session
+router.get('/validate-session', async (req, res) => {
+  const refreshToken = req.cookies.refreshToken;
+  if (!refreshToken) {
+    console.log('No refresh token in validate-session');
+    return res.status(401).json({ msg: 'No refresh token provided' });
+  }
+
+  try {
+    const decoded = jwt.verify(refreshToken, process.env.REFRESH_SECRET);
+    const userId = decoded.user.id;
+
+    const redisKey = `refresh_tokens_${userId}`;
+    const storedTokens = await redis.lrange(redisKey, 0, -1);
+    if (!storedTokens.includes(refreshToken)) {
+      console.log('Refresh token not found in Redis during validate-session:', refreshToken);
+      return res.status(401).json({ msg: 'Invalid refresh token (not found in Redis)' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      console.log('User not found during validate-session for ID:', userId);
+      return res.status(401).json({ msg: 'User not found' });
+    }
+
+    res.json({ msg: 'Session valid' });
+  } catch (err) {
+    console.error('Validate-session failed:', err.message);
+    res.status(401).json({ msg: 'Invalid refresh token', error: err.message });
   }
 });
 
